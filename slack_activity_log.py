@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-Slack Daily Message Counter
+Slack Activity Log - 発言回数カウンター
 
-指定したSlackチャンネルで、今日誰が何回発言したかをカウントするスクリプト。
+指定したSlackチャンネルの発言回数をユーザーごとにカウントして、
+アクティビティログとして表示するスクリプト。
 
 必要な環境変数:
     SLACK_BOT_TOKEN: Slack Bot Token (xoxb-で始まるもの)
@@ -74,20 +75,33 @@ def get_channel_messages(client: WebClient, channel_id: str, oldest: float, late
     return messages
 
 
-def get_user_name(client: WebClient, user_id: str, user_cache: dict):
-    """ユーザー名を取得（キャッシュ利用）"""
+def get_user_info(client: WebClient, user_id: str, user_cache: dict):
+    """ユーザー情報を取得（キャッシュ利用）"""
     if user_id in user_cache:
         return user_cache[user_id]
     
     try:
         result = client.users_info(user=user_id)
         user = result.get("user", {})
-        name = user.get("real_name") or user.get("name") or user_id
-        user_cache[user_id] = name
-        return name
+        info = {
+            "name": user.get("real_name") or user.get("name") or user_id,
+            "display_name": user.get("profile", {}).get("display_name") or user.get("name") or user_id,
+        }
+        user_cache[user_id] = info
+        return info
     except SlackApiError:
-        user_cache[user_id] = user_id
-        return user_id
+        info = {"name": user_id, "display_name": user_id}
+        user_cache[user_id] = info
+        return info
+
+
+def get_channel_name(client: WebClient, channel_id: str):
+    """チャンネル名を取得"""
+    try:
+        result = client.conversations_info(channel=channel_id)
+        return result.get("channel", {}).get("name", channel_id)
+    except SlackApiError:
+        return channel_id
 
 
 def count_messages_by_user(messages: list) -> dict:
@@ -105,6 +119,32 @@ def count_messages_by_user(messages: list) -> dict:
     return counts
 
 
+def print_activity_log(channel_name: str, date_str: str, results: list, total: int):
+    """アクティビティログを表示"""
+    width = 50
+    
+    print("")
+    print("+" + "=" * (width - 2) + "+")
+    print("|" + " SLACK ACTIVITY LOG ".center(width - 2) + "|")
+    print("+" + "=" * (width - 2) + "+")
+    print(f"| Channel: #{channel_name}".ljust(width - 1) + "|")
+    print(f"| Date: {date_str}".ljust(width - 1) + "|")
+    print("+" + "-" * (width - 2) + "+")
+    print("|" + " 発言回数ランキング ".center(width - 4) + "|")
+    print("+" + "-" * (width - 2) + "+")
+    
+    for i, (name, count) in enumerate(results, 1):
+        bar_length = min(int(count / max(r[1] for r in results) * 15), 15)
+        bar = "█" * bar_length
+        line = f"| {i:2}. {name[:18]:<18} {count:>4}回 {bar}"
+        print(line.ljust(width - 1) + "|")
+    
+    print("+" + "-" * (width - 2) + "+")
+    print(f"| Total: {total}回 / {len(results)}人".ljust(width - 1) + "|")
+    print("+" + "=" * (width - 2) + "+")
+    print("")
+
+
 def main():
     token = os.environ.get("SLACK_BOT_TOKEN")
     if not token:
@@ -113,9 +153,11 @@ def main():
         sys.exit(1)
     
     if len(sys.argv) < 2:
-        print("Usage: python daily_message_counter.py <channel_id>")
+        print("Slack Activity Log - 発言回数カウンター")
         print("")
-        print("例: python daily_message_counter.py C0AH0HW2HJL")
+        print("Usage: python slack_activity_log.py <channel_id>")
+        print("")
+        print("例: python slack_activity_log.py C0AH0HW2HJL")
         print("")
         print("チャンネルIDの確認方法:")
         print("  1. Slackでチャンネルを右クリック")
@@ -131,12 +173,12 @@ def main():
     client = WebClient(token=token)
     
     oldest, latest = get_today_timestamps()
+    today_str = datetime.now().strftime("%Y-%m-%d")
     
-    print(f"チャンネル {channel_id} の今日の発言を集計中...")
-    print(f"対象期間: {datetime.fromtimestamp(oldest)} ~ {datetime.fromtimestamp(latest)}")
-    print("")
+    print(f"チャンネル {channel_id} のアクティビティを取得中...")
     
     try:
+        channel_name = get_channel_name(client, channel_id)
         messages = get_channel_messages(client, channel_id, oldest, latest)
     except SlackApiError as e:
         if e.response["error"] == "channel_not_found":
@@ -153,29 +195,22 @@ def main():
     user_counts = count_messages_by_user(messages)
     
     if not user_counts:
-        print("今日の発言はありません。")
+        print("")
+        print(f"#{channel_name} には今日の発言がありません。")
         return
     
     user_cache = {}
     results = []
     
     for user_id, count in user_counts.items():
-        name = get_user_name(client, user_id, user_cache)
-        results.append((name, count))
+        info = get_user_info(client, user_id, user_cache)
+        results.append((info["name"], count))
     
     results.sort(key=lambda x: x[1], reverse=True)
     
-    print("=" * 40)
-    print("📊 今日の発言回数ランキング")
-    print("=" * 40)
+    total = sum(count for _, count in results)
     
-    total = 0
-    for i, (name, count) in enumerate(results, 1):
-        print(f"{i:2}. {name}: {count}回")
-        total += count
-    
-    print("-" * 40)
-    print(f"合計: {total}回 ({len(results)}人)")
+    print_activity_log(channel_name, today_str, results, total)
 
 
 if __name__ == "__main__":
