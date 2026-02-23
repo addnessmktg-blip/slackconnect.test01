@@ -1,0 +1,28 @@
+display_information:
+  name: タスクフィードバックBot
+  description: タスクリストのスクリーンショットを解析してフィードバックを提供します
+  background_color: "#4A154B"
+
+features:
+  bot_user:
+    display_name: TaskFeedbackBot
+    always_online: true
+
+oauth_config:
+  scopes:
+    bot:
+      - channels:history
+      - channels:read
+      - chat:write
+      - files:read
+      - users:read
+
+settings:
+  event_subscriptions:
+    bot_events:
+      - message.channels
+  interactivity:
+    is_enabled: false
+  org_deploy_enabled: false
+  socket_mode_enabled: true
+  token_rotation_enabled: false

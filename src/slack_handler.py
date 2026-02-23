@@ -28,36 +28,6 @@ class SlackHandler:
             token=settings.SLACK_BOT_TOKEN,
             signing_secret=settings.SLACK_SIGNING_SECRET
         )
-        self._setup_event_handlers()
-    
-    def _setup_event_handlers(self):
-        """イベントハンドラの設定"""
-        @self.app.event("message")
-        def handle_message(event, say):
-            self._on_message_received(event, say)
-        
-        @self.app.event("file_shared")
-        def handle_file_shared(event, say):
-            self._on_file_shared(event, say)
-    
-    def _on_message_received(self, event: dict, say):
-        """メッセージ受信時の処理"""
-        channel_id = event.get("channel")
-        if channel_id != settings.TARGET_CHANNEL_ID:
-            return
-        
-        files = event.get("files", [])
-        if files:
-            logger.info(f"画像付きメッセージを受信: {len(files)}件のファイル")
-            for file_info in files:
-                if self._is_image_file(file_info):
-                    self.process_task_image(event, file_info, say)
-    
-    def _on_file_shared(self, event: dict, say):
-        """ファイル共有時の処理"""
-        file_id = event.get("file_id")
-        if file_id:
-            logger.info(f"ファイル共有イベント受信: {file_id}")
     
     def _is_image_file(self, file_info: dict) -> bool:
         """画像ファイルかどうかを判定"""

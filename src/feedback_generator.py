@@ -15,6 +15,7 @@ sys.path.append(str(__file__).rsplit("/", 2)[0])
 from config.settings import settings
 from src.image_analyzer import TaskListAnalysis, ExtractedTask
 from src.task_manager import UserTaskConfig
+from src.rule_manager import RuleManager
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,7 @@ class FeedbackResult:
 class FeedbackGenerator:
     def __init__(self):
         self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        self.rule_manager = RuleManager()
     
     def generate_feedback(
         self,
@@ -190,24 +192,27 @@ class FeedbackGenerator:
             user_name=user_name
         )
         
+        # ルールからプロンプトを構築
+        rules_prompt = self.rule_manager.build_feedback_prompt()
+        
         try:
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": """あなたはチームのタスク管理をサポートするアシスタントです。
-建設的で励みになるフィードバックを提供してください。
-批判的になりすぎず、改善点は具体的かつ前向きに伝えてください。
+            system_content = f"""あなたはチームのタスク管理をサポートするアシスタントです。
+以下のルールに従ってフィードバックを提供してください。
+
+{rules_prompt}
 
 出力はJSON形式で:
-{
+{{
     "summary": "全体の要約（1-2文）",
     "praise_points": ["良い点1", "良い点2"],
     "improvements": ["改善提案1", "改善提案2"],
     "encouragement": "励ましのメッセージ"
-}"""
-                    },
+}}"""
+            
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": system_content},
                     {"role": "user", "content": prompt}
                 ],
                 max_tokens=1024,

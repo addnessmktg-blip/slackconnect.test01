@@ -20,6 +20,9 @@ class Settings:
     # チャンネル設定
     TARGET_CHANNEL_ID: str = os.getenv("TARGET_CHANNEL_ID", "C0A6N8RGV88")
     
+    # 管理者設定（週次レポート送信先）
+    ADMIN_USER_ID: str = os.getenv("ADMIN_USER_ID", "")
+    
     # パス設定
     BASE_DIR: Path = Path(__file__).parent.parent
     DATA_DIR: Path = Path(os.getenv("DATA_DIR", BASE_DIR / "data"))
