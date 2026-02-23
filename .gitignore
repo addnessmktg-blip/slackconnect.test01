@@ -1,0 +1,51 @@
+# 環境変数
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 仮想環境
+venv/
+ENV/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# データファイル（履歴は保存しない）
+data/task_history/*
+!data/task_history/.gitkeep
+
+# ユーザー設定（テンプレートは保存する）
+config/task_templates/*.json
+!config/task_templates/_global.json
+
+# ログ
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
