@@ -429,8 +429,6 @@ NGな終わり方（形式的すぎる）：
         parts.append("→ 「いいえ」なら、どの点が難しそうか教えてください！")
         parts.append("")
         parts.append("_※ 質問や相談は `@TaskFeedbackBot` をメンションして返信してね！_")
-        parts.append("")
-        parts.append("*返信で宮代に必ずタスクFBをもらってください！*")
         
         return "\n".join(parts)
     

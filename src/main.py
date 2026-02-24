@@ -77,11 +77,22 @@ class TaskFeedbackBot:
         channel_id = event.get("channel")
         user_id = event.get("user")
         message_ts = event.get("ts")
+        thread_ts = event.get("thread_ts")
+        text = event.get("text", "").strip()
         files = event.get("files", [])
         
         logger.info(f"channel={channel_id}, user={user_id}, files={len(files)}")
         
         if channel_id != settings.TARGET_CHANNEL_ID:
+            return
+        
+        # スレッド内で「OK」と返信された場合
+        if thread_ts and text.upper() == "OK":
+            logger.info(f"OK返信を検知: user={user_id}, thread={thread_ts}")
+            say(
+                text="宮代に必ずタスクFBをもらってください！",
+                thread_ts=thread_ts
+            )
             return
         
         if not files:
