@@ -90,7 +90,7 @@ class TaskFeedbackBot:
         if thread_ts and text.upper() == "OK":
             logger.info(f"OK返信を検知: user={user_id}, thread={thread_ts}")
             say(
-                text="宮代に必ずタスクFBをもらってください！",
+                text="今日も頑張っていきましょう！\n宮代にタスクFBは必ずもらってくださいね！",
                 thread_ts=thread_ts
             )
             return
