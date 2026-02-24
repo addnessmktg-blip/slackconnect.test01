@@ -493,7 +493,10 @@ class TaskFeedbackBot:
         if any(kw in question for kw in ["未提出", "まだの人", "出してない"]):
             logger.info("未提出者クエリを検出")
             try:
-                submitters = self.task_manager.get_today_submitters()
+                # Slackの履歴から直接提出者を取得
+                submitters = self.task_manager.get_today_submitters_from_slack(
+                    self.slack_handler, settings.TARGET_CHANNEL_ID
+                )
                 submitted_ids = {s["user_id"] for s in submitters}
                 logger.info(f"提出者数: {len(submitters)}")
                 
@@ -520,7 +523,10 @@ class TaskFeedbackBot:
         # 今日の提出者
         if any(kw in question for kw in ["提出者", "提出した", "誰が提出", "今日のタスク"]):
             logger.info("提出者クエリを検出")
-            submitters = self.task_manager.get_today_submitters()
+            # Slackの履歴から直接提出者を取得
+            submitters = self.task_manager.get_today_submitters_from_slack(
+                self.slack_handler, settings.TARGET_CHANNEL_ID
+            )
             
             if not submitters:
                 say(text="📋 *本日のタスク提出者*\n\nまだ誰も提出していません。", thread_ts=thread_ts)

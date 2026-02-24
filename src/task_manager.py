@@ -317,8 +317,57 @@ class TaskManager:
             logger.error(f"日次提出記録エラー: {e}")
             return False
     
+    def get_today_submitters_from_slack(self, slack_handler, channel_id: str) -> list[dict]:
+        """Slackの履歴から今日のタスク提出者を取得"""
+        from datetime import datetime, timedelta
+        
+        today = datetime.now()
+        start_of_day = today.replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        try:
+            messages = slack_handler.get_channel_history(
+                channel_id=channel_id,
+                oldest=start_of_day,
+                limit=200
+            )
+            
+            submitters = {}
+            for msg in messages:
+                user_id = msg.get("user")
+                files = msg.get("files", [])
+                
+                # 画像ファイルがあるメッセージのみ
+                has_image = any(f.get("mimetype", "").startswith("image/") for f in files)
+                if not has_image:
+                    continue
+                
+                if user_id and user_id not in submitters:
+                    user_info = slack_handler.get_user_info(user_id)
+                    # ボットを除外
+                    if user_info.get("is_bot"):
+                        continue
+                    
+                    ts = msg.get("ts", "")
+                    submitted_time = ""
+                    if ts:
+                        try:
+                            submitted_time = datetime.fromtimestamp(float(ts)).strftime("%H:%M")
+                        except:
+                            pass
+                    
+                    submitters[user_id] = {
+                        "user_id": user_id,
+                        "user_name": user_info.get("real_name") or user_info.get("name", user_id),
+                        "submitted_at": submitted_time
+                    }
+            
+            return list(submitters.values())
+        except Exception as e:
+            logger.error(f"Slack履歴から提出者取得エラー: {e}")
+            return []
+    
     def get_today_submitters(self) -> list[dict]:
-        """今日のタスク提出者一覧を取得"""
+        """今日のタスク提出者一覧を取得（後方互換性のため残す）"""
         submissions_file = self.history_dir / "_daily_submissions.json"
         today = datetime.now().strftime("%Y-%m-%d")
         
