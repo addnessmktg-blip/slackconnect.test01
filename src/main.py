@@ -472,7 +472,8 @@ class TaskFeedbackBot:
             else:
                 lines = ["📋 *本日のタスク提出者*\n"]
                 for i, s in enumerate(submitters, 1):
-                    lines.append(f"{i}. {s['user_name']}（タスク数: {s['task_count']}）")
+                    submitted_at = s.get('submitted_at', '')
+                    lines.append(f"{i}. {s['user_name']}（{submitted_at}）")
                 lines.append(f"\n*計 {len(submitters)}名* が提出済み")
                 say(text="\n".join(lines), thread_ts=thread_ts)
             return True
