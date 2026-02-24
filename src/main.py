@@ -95,6 +95,33 @@ class TaskFeedbackBot:
             )
             return
         
+        # メンション付きメッセージの場合は_on_mentionと同じ処理
+        import re
+        bot_mention_pattern = r'<@[A-Z0-9]+>'
+        if re.search(bot_mention_pattern, text):
+            logger.info(f"メンション付きメッセージを検出: text={text}")
+            question = re.sub(bot_mention_pattern, '', text).strip()
+            
+            if question.upper() == "OK":
+                say(
+                    text="今日も頑張っていきましょう！\n宮代にタスクFBは必ずもらってくださいね！",
+                    thread_ts=thread_ts or message_ts
+                )
+                return
+            
+            if self._handle_data_query(question, say, thread_ts or message_ts):
+                return
+            
+            # データクエリ以外はAIで回答
+            self._answer_question(
+                question=question,
+                context="",
+                user_id=user_id,
+                thread_ts=thread_ts or message_ts,
+                say=say
+            )
+            return
+        
         if not files:
             return
         
