@@ -482,9 +482,10 @@ class TaskFeedbackBot:
         if any(kw in question for kw in ["未提出", "まだの人", "出してない"]):
             submitters = self.task_manager.get_today_submitters()
             submitted_ids = {s["user_id"] for s in submitters}
-            all_users = self.task_manager.get_all_known_users()
+            # チャンネルメンバーから取得（ボット除外済み）
+            all_members = self.slack_handler.get_channel_members(settings.TARGET_CHANNEL_ID)
             
-            not_submitted = [u for u in all_users if u["user_id"] not in submitted_ids]
+            not_submitted = [u for u in all_members if u["user_id"] not in submitted_ids]
             
             if not not_submitted:
                 say(text="📋 *本日の未提出者*\n\n全員提出済みです！🎉", thread_ts=thread_ts)

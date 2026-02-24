@@ -132,6 +132,29 @@ class SlackHandler:
         """タスク画像を処理（外部から呼び出し用のフック）"""
         pass
     
+    def get_channel_members(self, channel_id: str) -> list[dict]:
+        """チャンネルのメンバー一覧を取得（ボット除外）"""
+        try:
+            result = self.client.conversations_members(channel=channel_id)
+            member_ids = result.get("members", [])
+            
+            members = []
+            for uid in member_ids:
+                user_info = self.get_user_info(uid)
+                # ボットを除外
+                if user_info.get("is_bot") or user_info.get("id") == "USLACKBOT":
+                    continue
+                
+                members.append({
+                    "user_id": uid,
+                    "user_name": user_info.get("real_name") or user_info.get("name", uid)
+                })
+            
+            return members
+        except SlackApiError as e:
+            logger.error(f"チャンネルメンバー取得エラー: {e}")
+            return []
+    
     def start(self):
         """Slackアプリを起動（Socket Mode）"""
         if not settings.SLACK_APP_TOKEN:
