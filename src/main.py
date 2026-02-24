@@ -454,10 +454,11 @@ class TaskFeedbackBot:
     
     def _handle_data_query(self, question: str, say, thread_ts: str) -> bool:
         """データ照会コマンドを処理。処理した場合はTrueを返す"""
-        question_lower = question.lower()
+        logger.info(f"データクエリチェック: question='{question}'")
         
         # 今日の提出者
         if any(kw in question for kw in ["提出者", "提出した", "誰が提出", "今日のタスク"]):
+            logger.info("提出者クエリを検出")
             submitters = self.task_manager.get_today_submitters()
             
             if not submitters:
