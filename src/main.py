@@ -390,6 +390,14 @@ class TaskFeedbackBot:
             )
             return
         
+        # 「OK」の場合は定型メッセージを返す
+        if question.upper() == "OK":
+            say(
+                text="今日も頑張っていきましょう！\n宮代にタスクFBは必ずもらってくださいね！",
+                thread_ts=thread_ts or message_ts
+            )
+            return
+        
         # スレッド内の場合、元のタスク履歴を取得
         context = ""
         if thread_ts:
