@@ -398,6 +398,10 @@ class TaskFeedbackBot:
             )
             return
         
+        # データ照会コマンド
+        if self._handle_data_query(question, say, thread_ts or message_ts):
+            return
+        
         # スレッド内の場合、元のタスク履歴を取得
         context = ""
         if thread_ts:
@@ -447,6 +451,62 @@ class TaskFeedbackBot:
         except Exception as e:
             logger.error(f"質問回答エラー: {e}")
             say(text="申し訳ありません、回答の生成中にエラーが発生しました。", thread_ts=thread_ts)
+    
+    def _handle_data_query(self, question: str, say, thread_ts: str) -> bool:
+        """データ照会コマンドを処理。処理した場合はTrueを返す"""
+        question_lower = question.lower()
+        
+        # 今日の提出者
+        if any(kw in question for kw in ["提出者", "提出した", "誰が提出", "今日のタスク"]):
+            submitters = self.task_manager.get_today_submitters()
+            
+            if not submitters:
+                say(text="📋 *本日のタスク提出者*\n\nまだ誰も提出していません。", thread_ts=thread_ts)
+            else:
+                lines = ["📋 *本日のタスク提出者*\n"]
+                for i, s in enumerate(submitters, 1):
+                    lines.append(f"{i}. {s['user_name']}（タスク数: {s['task_count']}）")
+                lines.append(f"\n*計 {len(submitters)}名* が提出済み")
+                say(text="\n".join(lines), thread_ts=thread_ts)
+            return True
+        
+        # 未提出者
+        if any(kw in question for kw in ["未提出", "まだの人", "出してない"]):
+            submitters = self.task_manager.get_today_submitters()
+            submitted_ids = {s["user_id"] for s in submitters}
+            all_users = self.task_manager.get_all_known_users()
+            
+            not_submitted = [u for u in all_users if u["user_id"] not in submitted_ids]
+            
+            if not not_submitted:
+                say(text="📋 *本日の未提出者*\n\n全員提出済みです！🎉", thread_ts=thread_ts)
+            else:
+                lines = ["📋 *本日の未提出者*\n"]
+                for i, u in enumerate(not_submitted, 1):
+                    lines.append(f"{i}. {u['user_name']}")
+                lines.append(f"\n*計 {len(not_submitted)}名* が未提出")
+                say(text="\n".join(lines), thread_ts=thread_ts)
+            return True
+        
+        # 稼働率・週間統計
+        if any(kw in question for kw in ["稼働率", "今週", "週間", "統計"]):
+            stats = self.task_manager.get_weekly_submission_stats()
+            
+            if not stats:
+                say(text="📊 *今週の稼働率*\n\nまだデータがありません。", thread_ts=thread_ts)
+            else:
+                today = datetime.now()
+                weekdays = ["月", "火", "水", "木", "金", "土", "日"]
+                current_day = weekdays[today.weekday()]
+                
+                lines = [f"📊 *今週の稼働率*（{current_day}曜日時点）\n"]
+                for i, s in enumerate(stats, 1):
+                    bar = "█" * (s["rate"] // 10) + "░" * (10 - s["rate"] // 10)
+                    lines.append(f"{i}. {s['user_name']}: {bar} {s['rate']}%（{s['submission_count']}/{s['weekdays_so_far']}日）")
+                say(text="\n".join(lines), thread_ts=thread_ts)
+            return True
+        
+        return False
 
     def _handle_setup_command(self, body: dict, say):
         """設定コマンドの処理"""
