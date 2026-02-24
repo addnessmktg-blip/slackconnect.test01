@@ -192,6 +192,40 @@ class RuleManager:
         if data.get("feedback_tone"):
             prompt_parts.append(f"【フィードバックのトーン】\n{data['feedback_tone']}")
         
+        # FBスコープ（定常/非定常）
+        if data.get("feedback_scope"):
+            scope = data["feedback_scope"]
+            scope_text = """【重要：FBの対象範囲】
+- 定常タスク：基本的にFB不要（毎日同じルーティンなので）
+- 非定常タスク：重点的にチェック（大タスク→小タスクの構造、0か100か判定など）
+
+定常タスクにMTGの時間と内容が入っている場合は、定例なのでOK。"""
+            prompt_parts.append(scope_text)
+        
+        # タスク終わり方のルール
+        if data.get("task_ending_rules"):
+            rules_text = ["【タスクの終わり方ルール】"]
+            for rule in data["task_ending_rules"]:
+                if rule.get("status") == "要改善":
+                    rules_text.append(f"- 「{rule['ending']}」で終わる → {rule['feedback']}")
+                    if rule.get("example_fix"):
+                        rules_text.append(f"  良い例: {rule['example_fix']}")
+                    if rule.get("ng_fix"):
+                        rules_text.append(f"  NG例: {rule['ng_fix']}")
+                elif rule.get("status") == "OK":
+                    rules_text.append(f"- 「{rule['ending']}」で終わる → OK（指摘不要）")
+            prompt_parts.append("\n".join(rules_text))
+        
+        # 修正後タスクのガイドライン
+        if data.get("fix_task_guidelines"):
+            guide = data["fix_task_guidelines"]
+            guide_text = [f"【修正後タスクの書き方】\n原則: {guide.get('principle', '')}"]
+            if guide.get("good_endings"):
+                guide_text.append("良い終わり方: " + ", ".join(guide["good_endings"][:3]))
+            if guide.get("bad_endings"):
+                guide_text.append("NGな終わり方: " + ", ".join(guide["bad_endings"][:2]))
+            prompt_parts.append("\n".join(guide_text))
+        
         # 絶対ルール
         if data.get("absolute_rules"):
             rules_text = []

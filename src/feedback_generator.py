@@ -201,13 +201,105 @@ class FeedbackGenerator:
 
 {rules_prompt}
 
+【FBの方針】
+1. 定常タスクは基本的にFBしない（構成がOKなら触れなくていい）
+2. 非定常タスクのみ重点的にチェック
+3. 良い点は素直に褒める（定常/非定常で分けてる、親子関係が明確など）
+4. 改善点は具体的に
+
+【非定常タスクの構造チェック】
+理想の構造：
+1. まず「目標」を書く
+2. その目標に対する「ボトルネック」を書く
+3. それに付随する形で大タスクを書く
+4. 大タスクの下に小タスクを書く
+
+チェックポイント：
+- 目標が書かれているか？
+- 大タスク同士の抽象度（粒度）は揃っているか？
+
+【粒度の判断ルール】
+- 粒度がわからない時は、勝手に判断せず質問する
+- 質問例：「〇〇」と「△△」は同じ粒度ですか？それとも「〇〇」は「△△」の一部ですか？
+- OK例：「新CJ作成」と「既存導線修正」は同じ粒度
+- 注意：LP作成がCJの中の一部なのか、別プロジェクトなのかは文脈による
+
+【タスクの終わり方チェック】
+OK（指摘不要）：
+- 「〜送る」→ やった/やってないが分かるのでOK
+- 「〜設定」→ やった/やってないが分かるのでOK
+- 「〜消す」→ やった/やってないが分かるのでOK
+- 「〜連携」→ ツール連携するだけなのでOK
+- 「〜洗い出す」→ OK
+
+要改善：
+- 「〜作成」→ 作ってどうするの？何で作るの？まず何からする？
+- 「〜考える」→ 考えてどうするの？FBもらうの？
+- 「〜整理」→ 終わりがわからない。どこまでやったら完了？
+- 「〜差し込み」→ 何に差し込むの？
+- 「〜確認」→ 確認後のアクションは？
+- 「〜進める」→ どこまで進めるの？
+
+【スルーしていいタスク】
+- 仕事ではなさそうな予定（整体に電話、健康診断予約など）はスルーでOK
+
 出力はJSON形式で:
 {{
-    "summary": "全体の要約（1-2文）",
-    "praise_points": ["良い点1", "良い点2"],
-    "improvements": ["改善提案1", "改善提案2"],
-    "encouragement": "励ましのメッセージ"
-}}"""
+    "structure_feedback": {{
+        "has_issue": true/false,
+        "issues": ["構成の問題点1", "構成の問題点2"]
+    }},
+    "task_feedback": [
+        {{
+            "target_task": "改善が必要なタスク名",
+            "instruction": "修正指示",
+            "fixed_task_template": "修正後タスクの穴埋め形式（例：LPを作成し、〇〇する）"
+        }}
+    ]
+}}
+
+【structure_feedback の例】
+- 目標からの繋がりがない場合：「今月の目標 → 大タスク → 小タスク の構成になっていない」
+- 定常/非定常の分類がない場合：「定常タスクと非定常タスクの分類がない」
+
+【task_feedback の書き方ルール】
+- fixed_task_templateは必ず「穴埋め形式」で書く
+- 具体的な内容は書かず、〇〇 でユーザーに考えさせる
+- ユーザーが自分で埋めることで、タスクを自分ごと化させる
+
+必ず守ること：
+- 「〇〇する」「〇〇に報告する」「〇〇でFBをもらう」のように〇〇を使う
+- 勝手に具体的な内容を埋めない
+
+良い例：
+- 「LPを作成し、〇〇する」
+- 「数値を計測し、〇〇に共有する」
+- 「スライドを作成し、〇〇にFBをもらう」
+
+悪い例（具体的すぎる）：
+- 「LPを作成し、チームに共有してFBをもらう」← NG
+- 「数値を計測し、Slackで報告する」← NG
+
+重要：
+- 定常タスクの構成が問題なければ「定常タスクの構成はOK」と褒める
+- 非定常タスクで親子関係ができていれば褒める
+- 改善点がなければimprovementsは空配列[]でOK
+- 改善点は本当に必要なものだけ。過剰に指摘しない
+
+【修正後タスク（fixed_task）の書き方ルール】
+修正後タスクは「次の具体的なアクション」で終わらせる。
+
+良い終わり方の例：
+- 〇〇を作成して実装する
+- 〇〇を決め、FBをもらう
+- 〇〇をまとめ、todoまで落とし込む
+- 〇〇をXXさんに振って、期限を切る
+- 〇〇を共有し、OKをもらう
+
+NGな終わり方（形式的すぎる）：
+- 共有フォルダに保存する ← NG
+- メールで共有する ← NG（共有だけで終わってる）
+- 進捗を確認する ← NG（確認だけで終わってる）"""
             
             response = self.client.chat.completions.create(
                 model="gpt-4o",
@@ -283,44 +375,60 @@ class FeedbackGenerator:
         
         # ヘッダー
         if user_name:
-            parts.append(f"📋 *{user_name}さんのタスクリストフィードバック*\n")
+            parts.append(f"📋 *{user_name}さんのタスクリストFB*\n")
         else:
-            parts.append("📋 *タスクリストフィードバック*\n")
+            parts.append("📋 *タスクリストFB*\n")
         
-        # 要約
-        if ai_feedback.get("summary"):
-            parts.append(f"*概要:* {ai_feedback['summary']}\n")
-        
-        # 良い点
-        praise_points = ai_feedback.get("praise_points", [])
-        if praise_points:
-            parts.append("*✨ 良い点:*")
-            for point in praise_points:
-                parts.append(f"• {point}")
+        # 1. タスクの構成について
+        structure = ai_feedback.get("structure_feedback", {})
+        if structure.get("has_issue") and structure.get("issues"):
+            parts.append("*【1. タスクの構成について】*")
+            for issue in structure["issues"]:
+                parts.append(f"• {issue}")
             parts.append("")
         
-        # 不足項目
-        if missing_items:
-            parts.append("*⚠️ 不足している項目:*")
-            for item in missing_items:
-                parts.append(f"• {item}")
+        # 2. 各タスクについて
+        task_fb = ai_feedback.get("task_feedback", ai_feedback.get("improvements", []))
+        if task_fb:
+            parts.append("*【2. 各タスクについて】*")
+            for i, item in enumerate(task_fb, 1):
+                if isinstance(item, dict):
+                    target = item.get("target_task", item.get("issue", ""))
+                    instruction = item.get("instruction", item.get("suggestion", ""))
+                    parts.append(f"{i}. 「{target}」")
+                    parts.append(f"   → {instruction}")
+                else:
+                    parts.append(f"{i}. {item}")
             parts.append("")
         
-        # 改善提案
-        improvements = ai_feedback.get("improvements", [])
-        if improvements:
-            parts.append("*💡 改善提案:*")
-            for improvement in improvements:
-                parts.append(f"• {improvement}")
-            parts.append("")
+        # 修正後タスクの例（穴埋め形式）
+        if task_fb:
+            fixed_tasks = []
+            for item in task_fb:
+                if isinstance(item, dict):
+                    template = item.get("fixed_task_template", item.get("fixed_task", ""))
+                    if template:
+                        fixed_tasks.append(template)
+            
+            if fixed_tasks:
+                parts.append("*【修正後タスクの例】* 📝")
+                parts.append("```")
+                for task in fixed_tasks:
+                    parts.append(f"□ {task}")
+                parts.append("```")
+                parts.append("")
         
-        # 昨日との比較
+        # 昨日との比較（ある場合）
         if comparison and "履歴がない" not in comparison:
-            parts.append(f"*📊 昨日との比較:* {comparison}\n")
+            parts.append(f"*【前日比較】* {comparison}\n")
         
-        # 励まし
-        if ai_feedback.get("encouragement"):
-            parts.append(f"_{ai_feedback['encouragement']}_")
+        # 確認質問
+        parts.append("---")
+        parts.append("*このタスクリストでやり切れそうですか？*")
+        parts.append("→ 「はい」なら :ok: リアクション")
+        parts.append("→ 「いいえ」なら、どの点が難しそうか教えてください！")
+        parts.append("")
+        parts.append("_※ 質問や相談は `@TaskFeedbackBot` をメンションして返信してね！_")
         
         return "\n".join(parts)
     

@@ -121,6 +121,7 @@ class TaskFeedbackBot:
         user_name = user_info.get("real_name") or user_info.get("name", "")
         
         today_analysis = None
+        has_no_date = False
         
         for file_info in image_files:
             image_data = self.slack_handler.download_image(file_info)
@@ -136,10 +137,26 @@ class TaskFeedbackBot:
             logger.info(f"検出: タスク数={len(analysis.tasks)}, 日付={analysis.date_detected}")
             
             # 今日の日付の画像を探す
-            if self._is_today_task(analysis):
+            is_today, status = self._is_today_task(analysis)
+            
+            if status == "no_date":
+                has_no_date = True
+                logger.info("日付が認識できませんでした")
+            elif is_today:
                 today_analysis = analysis
                 logger.info(f"今日のタスクリストを検出: {analysis.date_detected}")
                 break  # 今日の日付が見つかったら終了
+            else:
+                logger.info(f"昨日のタスクリストをスキップ: {analysis.date_detected}")
+        
+        # 日付が認識できなかった場合
+        if not today_analysis and has_no_date:
+            say(
+                text="📋 タスクリストに日付が見つかりませんでした。\n\n"
+                     "【今日のタスク】や日付（例: 2/24）を記載して、もう一度提出してください！",
+                thread_ts=message_ts
+            )
+            return
         
         if not today_analysis:
             logger.info("今日のタスクリストが見つかりませんでした")
@@ -200,42 +217,69 @@ class TaskFeedbackBot:
                 thread_ts=message_ts
             )
 
-    def _is_today_task(self, analysis) -> bool:
-        """今日の日付のタスクかどうかを判定"""
+    def _is_today_task(self, analysis) -> tuple[bool, str]:
+        """
+        今日の日付のタスクかどうかを判定
+        
+        Returns:
+            (is_today, status): 
+            - (True, "today") = 今日のタスク
+            - (False, "yesterday") = 昨日のタスク
+            - (False, "no_date") = 日付が認識できない
+        """
         if not analysis.date_detected:
-            return True
+            return (False, "no_date")
         
         today = datetime.now()
+        date_str = analysis.date_detected.replace(" ", "").replace("年", "/").replace("月", "/").replace("日", "")
+        
+        logger.info(f"日付検出: {analysis.date_detected} -> {date_str}")
+        
+        # 今日の日付パターン
         today_patterns = [
             today.strftime("%Y-%m-%d"),
             today.strftime("%Y/%m/%d"),
             today.strftime("%m/%d"),
             today.strftime("%m-%d"),
-            f"{today.month}月{today.day}日",
-            f"{today.year}年{today.month}月{today.day}日",
-            today.strftime("%Y年%m月%d日"),
+            f"{today.month}/{today.day}",
+            f"{today.day}",  # 日だけの場合
+            today.strftime("%-m/%-d") if hasattr(today, 'strftime') else f"{today.month}/{today.day}",
         ]
         
-        date_str = analysis.date_detected.replace(" ", "")
+        # ゼロ埋めなしのパターンも追加
+        today_patterns.append(f"{today.month}/{today.day}")
+        today_patterns.append(f"/{today.day}")
+        
         for pattern in today_patterns:
             if pattern in date_str:
-                return True
+                logger.info(f"今日のタスクリストを検出: パターン={pattern}")
+                return (True, "today")
         
+        # 昨日の日付パターン
         yesterday = today - timedelta(days=1)
         yesterday_patterns = [
             yesterday.strftime("%Y-%m-%d"),
             yesterday.strftime("%Y/%m/%d"),
             yesterday.strftime("%m/%d"),
             yesterday.strftime("%m-%d"),
-            f"{yesterday.month}月{yesterday.day}日",
+            f"{yesterday.month}/{yesterday.day}",
         ]
         
         for pattern in yesterday_patterns:
             if pattern in date_str:
                 logger.info(f"昨日のタスクリストを検出: {analysis.date_detected}")
-                return False
+                return (False, "yesterday")
         
-        return True
+        # 「今日」「本日」などのキーワードチェック
+        if "今日" in analysis.date_detected or "本日" in analysis.date_detected:
+            return (True, "today")
+        
+        if "昨日" in analysis.date_detected or "前回" in analysis.date_detected:
+            return (False, "yesterday")
+        
+        # 日付が検出されているが、今日/昨日と判定できない場合は今日として扱う
+        logger.info(f"日付検出されたが判定不明、今日として扱う: {analysis.date_detected}")
+        return (True, "today")
 
     def _process_task_image(
         self,
