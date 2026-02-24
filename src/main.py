@@ -108,6 +108,12 @@ class TaskFeedbackBot:
         
         logger.info(f"タスク画像を受信: user={user_id}, files={len(image_files)}")
         
+        # ユーザー情報を取得して日次提出を記録
+        user_info = self.slack_handler.get_user_info(user_id)
+        user_name = user_info.get("real_name") or user_info.get("name", "")
+        self.task_manager.record_daily_submission(user_id, user_name)
+        logger.info(f"日次提出を記録: user={user_name}")
+        
         # 複数画像がある場合、今日の日付の画像を探す
         self._process_task_images(
             user_id=user_id,

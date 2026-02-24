@@ -284,87 +284,124 @@ class TaskManager:
             "振り返り・学び"
         ]
     
+    def record_daily_submission(self, user_id: str, user_name: str) -> bool:
+        """日次提出を記録"""
+        submissions_file = self.history_dir / "_daily_submissions.json"
+        today = datetime.now().strftime("%Y-%m-%d")
+        now = datetime.now().strftime("%H:%M:%S")
+        
+        try:
+            if submissions_file.exists():
+                with open(submissions_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            else:
+                data = {}
+            
+            if today not in data:
+                data[today] = []
+            
+            # 既に提出済みかチェック
+            existing_ids = [s["user_id"] for s in data[today]]
+            if user_id not in existing_ids:
+                data[today].append({
+                    "user_id": user_id,
+                    "user_name": user_name,
+                    "submitted_at": now
+                })
+            
+            with open(submissions_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            
+            return True
+        except Exception as e:
+            logger.error(f"日次提出記録エラー: {e}")
+            return False
+    
     def get_today_submitters(self) -> list[dict]:
         """今日のタスク提出者一覧を取得"""
+        submissions_file = self.history_dir / "_daily_submissions.json"
         today = datetime.now().strftime("%Y-%m-%d")
-        submitters = []
         
-        for history_file in self.history_dir.glob("*.json"):
-            try:
-                with open(history_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                
-                user_id = history_file.stem
-                entries = data.get("entries", [])
-                
-                for entry in entries:
-                    if entry.get("date") == today:
-                        submitters.append({
-                            "user_id": user_id,
-                            "user_name": entry.get("user_name", user_id),
-                            "submitted_at": entry.get("submitted_at", ""),
-                            "task_count": len(entry.get("tasks", []))
-                        })
-                        break
-            except Exception as e:
-                logger.error(f"履歴ファイル読み込みエラー: {e}")
-                continue
-        
-        return submitters
+        try:
+            if not submissions_file.exists():
+                return []
+            
+            with open(submissions_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            
+            return data.get(today, [])
+        except Exception as e:
+            logger.error(f"提出者取得エラー: {e}")
+            return []
     
     def get_weekly_submission_stats(self) -> list[dict]:
         """今週の提出統計を取得（稼働率）"""
+        submissions_file = self.history_dir / "_daily_submissions.json"
         today = datetime.now()
         week_start = today - timedelta(days=today.weekday())
-        
-        stats = {}
         weekdays_so_far = min(today.weekday() + 1, 5)
         
-        for history_file in self.history_dir.glob("*.json"):
-            try:
-                with open(history_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                
-                user_id = history_file.stem
-                entries = data.get("entries", [])
-                user_name = ""
-                submission_count = 0
-                
-                for entry in entries:
-                    entry_date = datetime.strptime(entry.get("date", ""), "%Y-%m-%d")
-                    if entry_date >= week_start and entry_date <= today:
-                        submission_count += 1
-                        if not user_name:
-                            user_name = entry.get("user_name", user_id)
-                
-                if submission_count > 0 or user_id in stats:
-                    stats[user_id] = {
-                        "user_id": user_id,
-                        "user_name": user_name or user_id,
-                        "submission_count": submission_count,
-                        "weekdays_so_far": weekdays_so_far,
-                        "rate": round(submission_count / weekdays_so_far * 100) if weekdays_so_far > 0 else 0
-                    }
-            except Exception as e:
-                logger.error(f"統計計算エラー: {e}")
-                continue
-        
-        return sorted(stats.values(), key=lambda x: x["rate"], reverse=True)
+        try:
+            if not submissions_file.exists():
+                return []
+            
+            with open(submissions_file, "r", encoding="utf-8") as f:
+                all_data = json.load(f)
+            
+            # ユーザーごとの提出数を集計
+            user_stats = {}
+            
+            for date_str, submitters in all_data.items():
+                try:
+                    date = datetime.strptime(date_str, "%Y-%m-%d")
+                    if date >= week_start and date <= today:
+                        for s in submitters:
+                            uid = s["user_id"]
+                            if uid not in user_stats:
+                                user_stats[uid] = {
+                                    "user_id": uid,
+                                    "user_name": s["user_name"],
+                                    "submission_count": 0
+                                }
+                            user_stats[uid]["submission_count"] += 1
+                except:
+                    continue
+            
+            # 稼働率を計算
+            result = []
+            for uid, stat in user_stats.items():
+                stat["weekdays_so_far"] = weekdays_so_far
+                stat["rate"] = round(stat["submission_count"] / weekdays_so_far * 100) if weekdays_so_far > 0 else 0
+                result.append(stat)
+            
+            return sorted(result, key=lambda x: x["rate"], reverse=True)
+        except Exception as e:
+            logger.error(f"統計計算エラー: {e}")
+            return []
     
     def get_all_known_users(self) -> list[dict]:
         """履歴のある全ユーザーを取得"""
-        users = []
-        for history_file in self.history_dir.glob("*.json"):
-            try:
-                with open(history_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                entries = data.get("entries", [])
-                if entries:
-                    latest = entries[-1]
-                    users.append({
-                        "user_id": history_file.stem,
-                        "user_name": latest.get("user_name", history_file.stem)
-                    })
-            except:
-                continue
-        return users
+        submissions_file = self.history_dir / "_daily_submissions.json"
+        
+        try:
+            if not submissions_file.exists():
+                return []
+            
+            with open(submissions_file, "r", encoding="utf-8") as f:
+                all_data = json.load(f)
+            
+            # 全日付からユニークなユーザーを取得
+            users = {}
+            for date_str, submitters in all_data.items():
+                for s in submitters:
+                    uid = s["user_id"]
+                    if uid not in users:
+                        users[uid] = {
+                            "user_id": uid,
+                            "user_name": s["user_name"]
+                        }
+            
+            return list(users.values())
+        except Exception as e:
+            logger.error(f"ユーザー一覧取得エラー: {e}")
+            return []
