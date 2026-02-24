@@ -464,22 +464,31 @@ class TaskFeedbackBot:
         
         # 未提出者（「提出者」より先にチェック - 「未提出者」に「提出者」が含まれるため）
         if any(kw in question for kw in ["未提出", "まだの人", "出してない"]):
-            submitters = self.task_manager.get_today_submitters()
-            submitted_ids = {s["user_id"] for s in submitters}
-            # チャンネルメンバーから取得（ボット除外済み）
-            all_members = self.slack_handler.get_channel_members(settings.TARGET_CHANNEL_ID)
-            
-            not_submitted = [u for u in all_members if u["user_id"] not in submitted_ids]
-            
-            if not not_submitted:
-                say(text="📋 *本日の未提出者*\n\n全員提出済みです！🎉", thread_ts=thread_ts)
-            else:
-                lines = ["📋 *本日の未提出者*\n"]
-                for i, u in enumerate(not_submitted, 1):
-                    lines.append(f"{i}. {u['user_name']}")
-                lines.append(f"\n*計 {len(not_submitted)}名* が未提出")
-                say(text="\n".join(lines), thread_ts=thread_ts)
-            return True
+            logger.info("未提出者クエリを検出")
+            try:
+                submitters = self.task_manager.get_today_submitters()
+                submitted_ids = {s["user_id"] for s in submitters}
+                logger.info(f"提出者数: {len(submitters)}")
+                
+                # チャンネルメンバーから取得（ボット除外済み）
+                all_members = self.slack_handler.get_channel_members(settings.TARGET_CHANNEL_ID)
+                logger.info(f"チャンネルメンバー数: {len(all_members)}")
+                
+                not_submitted = [u for u in all_members if u["user_id"] not in submitted_ids]
+                
+                if not not_submitted:
+                    say(text="📋 *本日の未提出者*\n\n全員提出済みです！🎉", thread_ts=thread_ts)
+                else:
+                    lines = ["📋 *本日の未提出者*\n"]
+                    for i, u in enumerate(not_submitted, 1):
+                        lines.append(f"{i}. {u['user_name']}")
+                    lines.append(f"\n*計 {len(not_submitted)}名* が未提出")
+                    say(text="\n".join(lines), thread_ts=thread_ts)
+                return True
+            except Exception as e:
+                logger.error(f"未提出者クエリエラー: {e}")
+                say(text=f"エラーが発生しました: {e}", thread_ts=thread_ts)
+                return True
         
         # 今日の提出者
         if any(kw in question for kw in ["提出者", "提出した", "誰が提出", "今日のタスク"]):
