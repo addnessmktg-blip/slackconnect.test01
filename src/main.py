@@ -462,23 +462,7 @@ class TaskFeedbackBot:
         """データ照会コマンドを処理。処理した場合はTrueを返す"""
         logger.info(f"データクエリチェック: question='{question}'")
         
-        # 今日の提出者
-        if any(kw in question for kw in ["提出者", "提出した", "誰が提出", "今日のタスク"]):
-            logger.info("提出者クエリを検出")
-            submitters = self.task_manager.get_today_submitters()
-            
-            if not submitters:
-                say(text="📋 *本日のタスク提出者*\n\nまだ誰も提出していません。", thread_ts=thread_ts)
-            else:
-                lines = ["📋 *本日のタスク提出者*\n"]
-                for i, s in enumerate(submitters, 1):
-                    submitted_at = s.get('submitted_at', '')
-                    lines.append(f"{i}. {s['user_name']}（{submitted_at}）")
-                lines.append(f"\n*計 {len(submitters)}名* が提出済み")
-                say(text="\n".join(lines), thread_ts=thread_ts)
-            return True
-        
-        # 未提出者
+        # 未提出者（「提出者」より先にチェック - 「未提出者」に「提出者」が含まれるため）
         if any(kw in question for kw in ["未提出", "まだの人", "出してない"]):
             submitters = self.task_manager.get_today_submitters()
             submitted_ids = {s["user_id"] for s in submitters}
@@ -494,6 +478,22 @@ class TaskFeedbackBot:
                 for i, u in enumerate(not_submitted, 1):
                     lines.append(f"{i}. {u['user_name']}")
                 lines.append(f"\n*計 {len(not_submitted)}名* が未提出")
+                say(text="\n".join(lines), thread_ts=thread_ts)
+            return True
+        
+        # 今日の提出者
+        if any(kw in question for kw in ["提出者", "提出した", "誰が提出", "今日のタスク"]):
+            logger.info("提出者クエリを検出")
+            submitters = self.task_manager.get_today_submitters()
+            
+            if not submitters:
+                say(text="📋 *本日のタスク提出者*\n\nまだ誰も提出していません。", thread_ts=thread_ts)
+            else:
+                lines = ["📋 *本日のタスク提出者*\n"]
+                for i, s in enumerate(submitters, 1):
+                    submitted_at = s.get('submitted_at', '')
+                    lines.append(f"{i}. {s['user_name']}（{submitted_at}）")
+                lines.append(f"\n*計 {len(submitters)}名* が提出済み")
                 say(text="\n".join(lines), thread_ts=thread_ts)
             return True
         
